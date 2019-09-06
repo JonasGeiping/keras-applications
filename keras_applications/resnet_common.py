@@ -60,7 +60,7 @@ WEIGHTS_HASHES = {
 }
 
 
-def block1(x, filters, kernel_size=3, stride=1,
+def block1(x, filters, params=None, kernel_size=3, stride=1,
            conv_shortcut=True, name=None):
     """A residual block.
 
@@ -80,33 +80,33 @@ def block1(x, filters, kernel_size=3, stride=1,
 
     if conv_shortcut is True:
         shortcut = layers.Conv2D(4 * filters, 1, strides=stride,
-                                 name=name + '_0_conv')(x)
+                                 name=name + '_0_conv')(x, params=params)
         shortcut = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                             name=name + '_0_bn')(shortcut)
+                                             name=name + '_0_bn')(shortcut, params=params)
     else:
         shortcut = x
 
-    x = layers.Conv2D(filters, 1, strides=stride, name=name + '_1_conv')(x)
+    x = layers.Conv2D(filters, 1, strides=stride, name=name + '_1_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_1_bn')(x)
+                                  name=name + '_1_bn')(x, params=params)
     x = layers.Activation('relu', name=name + '_1_relu')(x)
 
     x = layers.Conv2D(filters, kernel_size, padding='SAME',
-                      name=name + '_2_conv')(x)
+                      name=name + '_2_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_2_bn')(x)
+                                  name=name + '_2_bn')(x, params=params)
     x = layers.Activation('relu', name=name + '_2_relu')(x)
 
-    x = layers.Conv2D(4 * filters, 1, name=name + '_3_conv')(x)
+    x = layers.Conv2D(4 * filters, 1, name=name + '_3_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_3_bn')(x)
+                                  name=name + '_3_bn')(x, params=params)
 
     x = layers.Add(name=name + '_add')([shortcut, x])
     x = layers.Activation('relu', name=name + '_out')(x)
     return x
 
 
-def stack1(x, filters, blocks, stride1=2, name=None):
+def stack1(x, filters, blocks, params=None, stride1=2, name=None):
     """A set of stacked residual blocks.
 
     # Arguments
@@ -119,13 +119,13 @@ def stack1(x, filters, blocks, stride1=2, name=None):
     # Returns
         Output tensor for the stacked blocks.
     """
-    x = block1(x, filters, stride=stride1, name=name + '_block1')
+    x = block1(x, filters, params=params, stride=stride1, name=name + '_block1')
     for i in range(2, blocks + 1):
-        x = block1(x, filters, conv_shortcut=False, name=name + '_block' + str(i))
+        x = block1(x, filters, params=params, conv_shortcut=False, name=name + '_block' + str(i))
     return x
 
 
-def block2(x, filters, kernel_size=3, stride=1,
+def block2(x, filters, params=None, kernel_size=3, stride=1,
            conv_shortcut=False, name=None):
     """A residual block.
 
@@ -144,34 +144,34 @@ def block2(x, filters, kernel_size=3, stride=1,
     bn_axis = 3 if backend.image_data_format() == 'channels_last' else 1
 
     preact = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                       name=name + '_preact_bn')(x)
+                                       name=name + '_preact_bn')(x, params=params)
     preact = layers.Activation('relu', name=name + '_preact_relu')(preact)
 
     if conv_shortcut is True:
         shortcut = layers.Conv2D(4 * filters, 1, strides=stride,
-                                 name=name + '_0_conv')(preact)
+                                 name=name + '_0_conv')(preact, params=params)
     else:
         shortcut = layers.MaxPooling2D(1, strides=stride)(x) if stride > 1 else x
 
     x = layers.Conv2D(filters, 1, strides=1, use_bias=False,
-                      name=name + '_1_conv')(preact)
+                      name=name + '_1_conv')(preact, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_1_bn')(x)
+                                  name=name + '_1_bn')(x, params=params)
     x = layers.Activation('relu', name=name + '_1_relu')(x)
 
     x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)), name=name + '_2_pad')(x)
     x = layers.Conv2D(filters, kernel_size, strides=stride,
-                      use_bias=False, name=name + '_2_conv')(x)
+                      use_bias=False, name=name + '_2_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_2_bn')(x)
+                                  name=name + '_2_bn')(x, params=params)
     x = layers.Activation('relu', name=name + '_2_relu')(x)
 
-    x = layers.Conv2D(4 * filters, 1, name=name + '_3_conv')(x)
+    x = layers.Conv2D(4 * filters, 1, name=name + '_3_conv')(x, params=params)
     x = layers.Add(name=name + '_out')([shortcut, x])
     return x
 
 
-def stack2(x, filters, blocks, stride1=2, name=None):
+def stack2(x, filters, blocks, params=None, stride1=2, name=None):
     """A set of stacked residual blocks.
 
     # Arguments
@@ -186,12 +186,12 @@ def stack2(x, filters, blocks, stride1=2, name=None):
     """
     x = block2(x, filters, conv_shortcut=True, name=name + '_block1')
     for i in range(2, blocks):
-        x = block2(x, filters, name=name + '_block' + str(i))
-    x = block2(x, filters, stride=stride1, name=name + '_block' + str(blocks))
+        x = block2(x, filters, params=params, name=name + '_block' + str(i))
+    x = block2(x, filters, params=params, stride=stride1, name=name + '_block' + str(blocks))
     return x
 
 
-def block3(x, filters, kernel_size=3, stride=1, groups=32,
+def block3(x, filters, params=None, kernel_size=3, stride=1, groups=32,
            conv_shortcut=True, name=None):
     """A residual block.
 
@@ -212,21 +212,21 @@ def block3(x, filters, kernel_size=3, stride=1, groups=32,
 
     if conv_shortcut is True:
         shortcut = layers.Conv2D((64 // groups) * filters, 1, strides=stride,
-                                 use_bias=False, name=name + '_0_conv')(x)
+                                 use_bias=False, name=name + '_0_conv')(x, params=params)
         shortcut = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                             name=name + '_0_bn')(shortcut)
+                                             name=name + '_0_bn')(shortcut, params=params)
     else:
         shortcut = x
 
-    x = layers.Conv2D(filters, 1, use_bias=False, name=name + '_1_conv')(x)
+    x = layers.Conv2D(filters, 1, use_bias=False, name=name + '_1_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_1_bn')(x)
+                                  name=name + '_1_bn')(x, params=params)
     x = layers.Activation('relu', name=name + '_1_relu')(x)
 
     c = filters // groups
     x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)), name=name + '_2_pad')(x)
     x = layers.DepthwiseConv2D(kernel_size, strides=stride, depth_multiplier=c,
-                               use_bias=False, name=name + '_2_conv')(x)
+                               use_bias=False, name=name + '_2_conv')(x, params=params)
     x_shape = backend.int_shape(x)[1:-1]
     x = layers.Reshape(x_shape + (groups, c, c))(x)
     output_shape = x_shape + (groups, c) if backend.backend() == 'theano' else None
@@ -234,20 +234,20 @@ def block3(x, filters, kernel_size=3, stride=1, groups=32,
                       output_shape=output_shape, name=name + '_2_reduce')(x)
     x = layers.Reshape(x_shape + (filters,))(x)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_2_bn')(x)
-    x = layers.Activation('relu', name=name + '_2_relu')(x)
+                                  name=name + '_2_bn')(x, params=params)
+    x = layers.Activation('relu', name=name + '_2_relu')(x, params=params)
 
     x = layers.Conv2D((64 // groups) * filters, 1,
-                      use_bias=False, name=name + '_3_conv')(x)
+                      use_bias=False, name=name + '_3_conv')(x, params=params)
     x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                  name=name + '_3_bn')(x)
+                                  name=name + '_3_bn')(x, params=params)
 
     x = layers.Add(name=name + '_add')([shortcut, x])
     x = layers.Activation('relu', name=name + '_out')(x)
     return x
 
 
-def stack3(x, filters, blocks, stride1=2, groups=32, name=None):
+def stack3(x, filters, blocks, params=None, stride1=2, groups=32, name=None):
     """A set of stacked residual blocks.
 
     # Arguments
@@ -261,16 +261,16 @@ def stack3(x, filters, blocks, stride1=2, groups=32, name=None):
     # Returns
         Output tensor for the stacked blocks.
     """
-    x = block3(x, filters, stride=stride1, groups=groups, name=name + '_block1')
+    x = block3(x, filters, params=params, stride=stride1, groups=groups, name=name + '_block1')
     for i in range(2, blocks + 1):
-        x = block3(x, filters, groups=groups, conv_shortcut=False,
+        x = block3(x, filters, params=params, groups=groups, conv_shortcut=False,
                    name=name + '_block' + str(i))
     return x
 
 
 def ResNet(stack_fn,
            preact,
-           use_bias,
+           use_bias, params=params,
            model_name='resnet',
            include_top=True,
            weights='imagenet',
@@ -360,26 +360,26 @@ def ResNet(stack_fn,
     bn_axis = 3 if backend.image_data_format() == 'channels_last' else 1
 
     x = layers.ZeroPadding2D(padding=((3, 3), (3, 3)), name='conv1_pad')(img_input)
-    x = layers.Conv2D(64, 7, strides=2, use_bias=use_bias, name='conv1_conv')(x)
+    x = layers.Conv2D(64, 7, strides=2, use_bias=use_bias, name='conv1_conv')(x, params=params)
 
     if preact is False:
         x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                      name='conv1_bn')(x)
+                                      name='conv1_bn')(x, params=params)
         x = layers.Activation('relu', name='conv1_relu')(x)
 
     x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)), name='pool1_pad')(x)
     x = layers.MaxPooling2D(3, strides=2, name='pool1_pool')(x)
 
-    x = stack_fn(x)
+    x = stack_fn(x, params=params)
 
     if preact is True:
         x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
-                                      name='post_bn')(x)
+                                      name='post_bn')(x, params=params)
         x = layers.Activation('relu', name='post_relu')(x)
 
     if include_top:
         x = layers.GlobalAveragePooling2D(name='avg_pool')(x)
-        x = layers.Dense(classes, activation='softmax', name='probs')(x)
+        x = layers.Dense(classes, activation=None, name='probs')(x, params=params)
     else:
         if pooling == 'avg':
             x = layers.GlobalAveragePooling2D(name='avg_pool')(x)
@@ -415,18 +415,19 @@ def ResNet(stack_fn,
     return model
 
 
-def ResNet50(include_top=True,
+def ResNet50(params=params,
+             include_top=True,
              weights='imagenet',
              input_tensor=None,
              input_shape=None,
              pooling=None,
              classes=1000,
              **kwargs):
-    def stack_fn(x):
-        x = stack1(x, 64, 3, stride1=1, name='conv2')
-        x = stack1(x, 128, 4, name='conv3')
-        x = stack1(x, 256, 6, name='conv4')
-        x = stack1(x, 512, 3, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack1(x, 64, 3, stride1=1, params=params, name='conv2')
+        x = stack1(x, 128, 4, params=params, name='conv3')
+        x = stack1(x, 256, 6, params=params, name='conv4')
+        x = stack1(x, 512, 3, params=params, name='conv5')
         return x
     return ResNet(stack_fn, False, True, 'resnet50',
                   include_top, weights,
@@ -442,11 +443,11 @@ def ResNet101(include_top=True,
               pooling=None,
               classes=1000,
               **kwargs):
-    def stack_fn(x):
-        x = stack1(x, 64, 3, stride1=1, name='conv2')
-        x = stack1(x, 128, 4, name='conv3')
-        x = stack1(x, 256, 23, name='conv4')
-        x = stack1(x, 512, 3, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack1(x, 64, 3, stride1=1, params=params, name='conv2')
+        x = stack1(x, 128, 4, params=params, name='conv3')
+        x = stack1(x, 256, 23, params=params, name='conv4')
+        x = stack1(x, 512, 3, params=params, name='conv5')
         return x
     return ResNet(stack_fn, False, True, 'resnet101',
                   include_top, weights,
@@ -462,11 +463,11 @@ def ResNet152(include_top=True,
               pooling=None,
               classes=1000,
               **kwargs):
-    def stack_fn(x):
-        x = stack1(x, 64, 3, stride1=1, name='conv2')
-        x = stack1(x, 128, 8, name='conv3')
-        x = stack1(x, 256, 36, name='conv4')
-        x = stack1(x, 512, 3, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack1(x, 64, 3, params=params, stride1=1, name='conv2')
+        x = stack1(x, 128, 8, params=params, name='conv3')
+        x = stack1(x, 256, 36, params=params, name='conv4')
+        x = stack1(x, 512, 3, params=params, name='conv5')
         return x
     return ResNet(stack_fn, False, True, 'resnet152',
                   include_top, weights,
@@ -482,11 +483,11 @@ def ResNet50V2(include_top=True,
                pooling=None,
                classes=1000,
                **kwargs):
-    def stack_fn(x):
-        x = stack2(x, 64, 3, name='conv2')
-        x = stack2(x, 128, 4, name='conv3')
-        x = stack2(x, 256, 6, name='conv4')
-        x = stack2(x, 512, 3, stride1=1, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack2(x, 64, 3, params=params, name='conv2')
+        x = stack2(x, 128, 4, params=params, name='conv3')
+        x = stack2(x, 256, 6, params=params, name='conv4')
+        x = stack2(x, 512, 3, params=params, stride1=1, name='conv5')
         return x
     return ResNet(stack_fn, True, True, 'resnet50v2',
                   include_top, weights,
@@ -502,11 +503,11 @@ def ResNet101V2(include_top=True,
                 pooling=None,
                 classes=1000,
                 **kwargs):
-    def stack_fn(x):
-        x = stack2(x, 64, 3, name='conv2')
-        x = stack2(x, 128, 4, name='conv3')
-        x = stack2(x, 256, 23, name='conv4')
-        x = stack2(x, 512, 3, stride1=1, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack2(x, 64, 3, params=params, name='conv2')
+        x = stack2(x, 128, 4, params=params, name='conv3')
+        x = stack2(x, 256, 23, params=params, name='conv4')
+        x = stack2(x, 512, 3, params=params, stride1=1, name='conv5')
         return x
     return ResNet(stack_fn, True, True, 'resnet101v2',
                   include_top, weights,
@@ -522,11 +523,11 @@ def ResNet152V2(include_top=True,
                 pooling=None,
                 classes=1000,
                 **kwargs):
-    def stack_fn(x):
-        x = stack2(x, 64, 3, name='conv2')
-        x = stack2(x, 128, 8, name='conv3')
-        x = stack2(x, 256, 36, name='conv4')
-        x = stack2(x, 512, 3, stride1=1, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack2(x, 64, 3, params=params, name='conv2')
+        x = stack2(x, 128, 8, params=params, name='conv3')
+        x = stack2(x, 256, 36, params=params, name='conv4')
+        x = stack2(x, 512, 3, params=params, stride1=1, name='conv5')
         return x
     return ResNet(stack_fn, True, True, 'resnet152v2',
                   include_top, weights,
@@ -542,11 +543,11 @@ def ResNeXt50(include_top=True,
               pooling=None,
               classes=1000,
               **kwargs):
-    def stack_fn(x):
-        x = stack3(x, 128, 3, stride1=1, name='conv2')
-        x = stack3(x, 256, 4, name='conv3')
-        x = stack3(x, 512, 6, name='conv4')
-        x = stack3(x, 1024, 3, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack3(x, 128, 3, params=params, stride1=1, name='conv2')
+        x = stack3(x, 256, 4, params=params, name='conv3')
+        x = stack3(x, 512, 6, params=params, name='conv4')
+        x = stack3(x, 1024, 3, params=params, name='conv5')
         return x
     return ResNet(stack_fn, False, False, 'resnext50',
                   include_top, weights,
@@ -562,11 +563,11 @@ def ResNeXt101(include_top=True,
                pooling=None,
                classes=1000,
                **kwargs):
-    def stack_fn(x):
-        x = stack3(x, 128, 3, stride1=1, name='conv2')
-        x = stack3(x, 256, 4, name='conv3')
-        x = stack3(x, 512, 23, name='conv4')
-        x = stack3(x, 1024, 3, name='conv5')
+    def stack_fn(x, params=params):
+        x = stack3(x, 128, 3, params=params, stride1=1, name='conv2')
+        x = stack3(x, 256, 4, params=params, name='conv3')
+        x = stack3(x, 512, 23, params=params, name='conv4')
+        x = stack3(x, 1024, 3, params=params, name='conv5')
         return x
     return ResNet(stack_fn, False, False, 'resnext101',
                   include_top, weights,

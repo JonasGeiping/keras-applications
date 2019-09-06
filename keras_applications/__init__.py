@@ -1,18 +1,29 @@
-"""Enables dynamic setting of underlying Keras module.
-"""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""Enables dynamic setting of underlying Keras module."""
 
-_KERAS_BACKEND = None
-_KERAS_LAYERS = None
-_KERAS_MODELS = None
-_KERAS_UTILS = None
+
+from tensorflow.python.keras import backend
+from tensorflow.python.keras import engine
+from tensorflow.python.keras import layers
+from tensorflow.python.keras import models
+from tensorflow.python.keras import utils
+from tensorflow.python.util import tf_inspect
+
+from learners.modules import Conv2D, BatchNormalization, Dense, DepthwiseConv2D
+
+
+_KERAS_BACKEND = backend
+_KERAS_LAYERS = layers
+_KERAS_MODELS = models
+_KERAS_UTILS = utils
 
 
 def get_submodules_from_kwargs(kwargs):
     backend = kwargs.get('backend', _KERAS_BACKEND)
     layers = kwargs.get('layers', _KERAS_LAYERS)
+    layers['Conv2D'] = Conv2D
+    layers['BatchNormalization'] = BatchNormalization
+    layers['Dense'] = Dense
+    layers['DepthwiseConv2D'] = DepthwiseConv2D
     models = kwargs.get('models', _KERAS_MODELS)
     utils = kwargs.get('utils', _KERAS_UTILS)
     for key in kwargs.keys():
